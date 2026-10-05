@@ -1,4 +1,4 @@
-name: Build GTA v63 TANGIER REAL CITY
+name: Build GTA v634 MINIMAL
 on: [push]
 jobs:
   build:
@@ -10,11 +10,10 @@ jobs:
       - uses: android-actions/setup-android@v4
       - uses: nttld/setup-ndk@v1
         with: { ndk-version: r25b }
-      - name: Clone Bullet
-        run: git clone https://github.com/bulletphysics/bullet3.git --depth 1
-      - name: Create v63 REAL CITY
+      - name: Create MINIMAL BUILD
         run: |
-          mkdir -p app/src/main/cpp app/src/main/java/com/turrinistudio/gtav
+          rm -rf app
+          mkdir -p app/src/main/java/com/turrinistudio/gtav
           cat > settings.gradle << 'EOF'
           include ':app'
           EOF
@@ -24,197 +23,51 @@ jobs:
               dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
           }
           allprojects { repositories { google(); mavenCentral() } }
-          task clean(type: Delete) { delete rootProject.buildDir }
           EOF
           cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
           android {
-              compileSdkVersion 33
+              compileSdkVersion 34
               defaultConfig {
                   applicationId "com.turrinistudio.gtav"
                   minSdkVersion 21
-                  targetSdkVersion 33
-                  versionCode 63
-                  versionName "6.3-REAL-CITY"
-                  externalNativeBuild { cmake { cppFlags "-std=c++17 -frtti -fexceptions -O2"; arguments "-DANDROID_STL=c++_shared" } }
+                  targetSdkVersion 34
+                  versionCode 634
+                  versionName "6.34-MINIMAL"
                   ndk { abiFilters "arm64-v8a" }
               }
-              externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt" } }
               namespace 'com.turrinistudio.gtav'
           }
           EOF
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
-              <application android:label="GTA Tangier REAL CITY" android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:extractNativeLibs="true">
-                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+              <application android:label="GTA Tangier" android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+                  <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
               </application>
           </manifest>
           EOF
-          cat > app/src/main/cpp/CMakeLists.txt << 'EOF'
-          cmake_minimum_required(VERSION 3.18)
-          project(gta63)
-          set(BULLET_ROOT ${CMAKE_SOURCE_DIR}/../../../../bullet3)
-          include_directories(${BULLET_ROOT}/src)
-          file(GLOB_RECURSE BULLET_SRC ${BULLET_ROOT}/src/*.cpp)
-          list(FILTER BULLET_SRC EXCLUDE REGEX ".*Bullet3.*")
-          list(FILTER BULLET_SRC EXCLUDE REGEX ".*examples.*")
-          list(FILTER BULLET_SRC EXCLUDE REGEX ".*OpenCL.*")
-          add_library(bullet STATIC ${BULLET_SRC})
-          target_include_directories(bullet PUBLIC ${BULLET_ROOT}/src)
-          add_library(rage SHARED main.cpp)
-          find_library(log-lib log)
-          find_library(gles-lib GLESv2)
-          target_link_libraries(rage bullet ${log-lib} ${gles-lib})
-          EOF
-          cat > app/src/main/cpp/main.cpp << 'ENDCPP'
-          #include <jni.h>
-          #include <btBulletDynamicsCommon.h>
-          #include <cmath>
-          struct GTAVehicle { int type; float mass, engineForce, brakeForce, maxSpeed, suspStiff, friction, steerLock; };
-          GTAVehicle gtaVehicles[3] = {{0, 1100.0f, 1800.0f, 80.0f, 38.8f, 30.0f, 1.4f, 0.66f},{1, 1400.0f, 2800.0f, 120.0f, 47.7f, 35.0f, 1.5f, 0.61f},{2, 1800.0f, 3500.0f, 150.0f, 55.0f, 40.0f, 1.6f, 0.52f}};
-          struct Engine { btDiscreteDynamicsWorld* world; btRigidBody* car; btRaycastVehicle* veh; float x=0,z=0,rot=0,sp=0; int curVehicle=1; bool init=false; bool onFoot=false; float charX=0,charZ=5;
-              void Init(int vType){ if(init && curVehicle==vType) return; curVehicle=vType; auto* cfg=new btDefaultCollisionConfiguration(); auto* disp=new btCollisionDispatcher(cfg); auto* broad=new btDbvtBroadphase(); auto* solv=new btSequentialImpulseConstraintSolver(); world=new btDiscreteDynamicsWorld(disp,broad,solv,cfg); world->setGravity(btVector3(0,-9.81f,0)); auto& vd=gtaVehicles[vType]; btCollisionShape* g=new btBoxShape(btVector3(500,0.5f,500)); btTransform gt; gt.setIdentity(); gt.setOrigin(btVector3(0,-0.5f,0)); world->addRigidBody(new btRigidBody(0,new btDefaultMotionState(gt),g,btVector3(0,0,0))); btCollisionShape* ch=new btBoxShape(btVector3(0.9f,0.4f,1.6f)); btTransform ct; ct.setIdentity(); ct.setOrigin(btVector3(0,2,0)); btVector3 in(0,0,0); ch->calculateLocalInertia(vd.mass,in); car=new btRigidBody(vd.mass,new btDefaultMotionState(ct),ch,in); world->addRigidBody(car); auto* ray=new btDefaultVehicleRaycaster(world); btRaycastVehicle::btVehicleTuning tun; tun.m_suspensionStiffness=vd.suspStiff; tun.m_suspensionCompression=4.5f; tun.m_suspensionDamping=2.5f; tun.m_maxSuspensionTravelCm=50; tun.m_frictionSlip=vd.friction; veh=new btRaycastVehicle(tun,car,ray); car->setActivationState(DISABLE_DEACTIVATION); world->addVehicle(veh); veh->setCoordinateSystem(0,1,2); for(int i=0;i<4;i++){ btVector3 conn(i<2?0.9f:-0.9f,-0.4f,i%2==0?1.2f:-1.2f); auto& w=veh->addWheel(conn,btVector3(0,-1,0),btVector3(-1,0,0),0.6f,0.5f,tun,i<2); w.m_suspensionStiffness=vd.suspStiff; w.m_frictionSlip=vd.friction; w.m_rollInfluence=0.15f; } init=true; }
-              void Update(float dt,bool gas,bool brake,bool left,bool right){ if(onFoot){ float s=3.0f; if(gas) charZ-=s*dt; if(brake) charZ+=s*dt; if(left) charX-=s*dt; if(right) charX+=s*dt; x=charX; z=charZ; return; } if(!init) Init(1); auto& vd=gtaVehicles[curVehicle]; float eng=0,brk=0,steer=0; if(gas) eng=vd.engineForce; if(brake) brk=vd.brakeForce; if(left) steer=vd.steerLock; if(right) steer=-vd.steerLock; veh->applyEngineForce(eng,2); veh->applyEngineForce(eng,3); veh->setBrake(brk,2); veh->setBrake(brk,3); veh->setSteeringValue(steer,0); veh->setSteeringValue(steer,1); world->stepSimulation(dt,10,1.f/60.f); btTransform tr; car->getMotionState()->getWorldTransform(tr); x=tr.getOrigin().getX(); z=tr.getOrigin().getZ(); btQuaternion q=tr.getRotation(); rot=atan2(2*(q.w()*q.y()+q.x()*q.z()),1-2*(q.y()*q.y()+q.z()*q.z()))*57.2958f; sp=car->getLinearVelocity().length()*3.6f; }
-              void SwitchVehicle(int t){ if(t>=0 && t<3){ curVehicle=t; init=false; Init(t); onFoot=false; } }
-              void ToggleFoot(){ onFoot=!onFoot; if(onFoot){ charX=x; charZ=z+3; } }
-          };
-          static Engine g;
-          extern "C" JNIEXPORT void JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeInit(JNIEnv*, jobject){ g.Init(1); }
-          extern "C" JNIEXPORT void JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeUpdate(JNIEnv*, jobject, jfloat dt, jboolean gas, jboolean brake, jboolean left, jboolean right){ g.Update(dt,gas,brake,left,right); }
-          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetX(JNIEnv*, jobject){ return g.x; }
-          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetZ(JNIEnv*, jobject){ return g.z; }
-          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetRot(JNIEnv*, jobject){ return g.rot; }
-          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetSpeed(JNIEnv*, jobject){ return g.sp; }
-          extern "C" JNIEXPORT void JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeSwitchVehicle(JNIEnv*, jobject, jint t){ g.SwitchVehicle(t); }
-          extern "C" JNIEXPORT void JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeToggleFoot(JNIEnv*, jobject){ g.ToggleFoot(); }
-          extern "C" JNIEXPORT jboolean JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeStartHost(JNIEnv*, jobject){ return true; }
-          extern "C" JNIEXPORT jboolean JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeJoinHost(JNIEnv* env, jobject, jstring ip){ return true; }
-          extern "C" JNIEXPORT jboolean JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeIsOnFoot(JNIEnv*, jobject){ return g.onFoot; }
-          ENDCPP
           cat > app/src/main/java/com/turrinistudio/gtav/MainActivity.java << 'ENDOFFILE'
           package com.turrinistudio.gtav;
-          import android.app.Activity; import android.opengl.GLSurfaceView; import android.os.Bundle; import android.widget.*; import android.view.*; import javax.microedition.khronos.egl.EGLConfig; import javax.microedition.khronos.opengles.GL10; import java.nio.*; import android.net.wifi.WifiManager; import android.text.format.Formatter; import android.graphics.Color;
+          import android.app.Activity;
+          import android.opengl.GLSurfaceView;
+          import android.os.Bundle;
           public class MainActivity extends Activity {
-              static { System.loadLibrary("rage"); }
-              public native void NativeInit(); public native void NativeUpdate(float dt, boolean gas, boolean brake, boolean left, boolean right);
-              public native float NativeGetX(); public native float NativeGetZ(); public native float NativeGetRot(); public native float NativeGetSpeed();
-              public native void NativeSwitchVehicle(int type); public native void NativeToggleFoot(); public native boolean NativeIsOnFoot(); public native boolean NativeStartHost(); public native boolean NativeJoinHost(String ip);
-              boolean gas=false, brake=false, left=false, right=false; TextView hud, speedText, carNameText; String realIP="192.168.1.10"; int curCar=1;
-              String[] carNames={"DACIA LOGAN TAXI","MERCEDES AMG GT","BUGATTI CHIRON"};
-              String getRealWifiIP(){ try{ WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE); int ip=wm.getConnectionInfo().getIpAddress(); String s=Formatter.formatIpAddress(ip); if(s!=null &&!s.equals("0.0.0.0")) return s; }catch(Exception e){} return "192.168.1.10"; }
-              @Override protected void onCreate(Bundle b){
-                  super.onCreate(b); NativeInit(); realIP=getRealWifiIP();
-                  GLSurfaceView glView = new GLSurfaceView(this);
-                  glView.setRenderer(new GLSurfaceView.Renderer(){
-                      FloatBuffer cube, pyramid;
-                      // TANGIER REAL BUILDINGS - MARINA + CORNICHE
-                      float[][] buildings = {
-                          // Marina - فيلات فخمة على البحر
-                          {-60,80,12}, {-40,85,10}, {-20,80,14}, {0,85,11}, {20,80,12},
-                          // Corniche - مقاهي ومطاعم
-                          {-50,40,8}, {-30,42,6}, {-10,40,7}, {10,41,6}, {30,40,8}, {50,42,7},
-                          // City Center - بنايات عالية
-                          {-60,0,15}, {-40,5,18}, {-20,-5,16}, {0,0,20}, {20,5,17}, {40,0,15}, {60,5,14},
-                          {-60,-30,10}, {-40,-35,12}, {40,-30,11}, {60,-35,10},
-                          // Port - ميناء
-                          {-30,-70,8}, {0,-75,10}, {30,-70,9}
-                      };
-                      public void onSurfaceCreated(GL10 gl, EGLConfig c){
-                          gl.glClearColor(0.53f,0.81f,0.92f,1f); gl.glEnable(GL10.GL_DEPTH_TEST); gl.glEnable(GL10.GL_BLEND); gl.glBlendFunc(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA);
-                          float[] v={-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f};
-                          ByteBuffer bb=ByteBuffer.allocateDirect(v.length*4); bb.order(ByteOrder.nativeOrder()); cube=bb.asFloatBuffer(); cube.put(v); cube.position(0);
-                      }
-                      public void onSurfaceChanged(GL10 gl,int w,int h){ gl.glViewport(0,0,w,h); gl.glMatrixMode(GL10.GL_PROJECTION); gl.glLoadIdentity(); float ratio=(float)w/h; gl.glFrustumf(-ratio*0.9f,ratio*0.9f,-0.9f,0.9f,1.5f,600f); }
-                      public void onDrawFrame(GL10 gl){
-                          NativeUpdate(0.016f,gas,brake,left,right); float carX=NativeGetX(); float carZ=NativeGetZ(); float carRot=NativeGetRot(); float speed=NativeGetSpeed(); boolean onFoot=NativeIsOnFoot();
-                          runOnUiThread(()->{ speedText.setText(onFoot?String.format("WALK %.1f",speed):String.format("%.0f KM/H",speed)); });
-                          gl.glClear(GL10.GL_COLOR_BUFFER_BIT|GL10.GL_DEPTH_BUFFER_BIT);
-                          gl.glMatrixMode(GL10.GL_MODELVIEW); gl.glLoadIdentity();
-                          // GTA5 CAMERA - FIXED
-                          gl.glTranslatef(0,-2.2f,-9f); gl.glRotatef(16,1,0,0); gl.glRotatef(-carRot,0,1,0); gl.glTranslatef(-carX,0,-carZ);
-                          // GROUND - طنجة
-                          gl.glPushMatrix(); gl.glTranslatef(0,-1.0f,0); drawCube(gl,800,0.3f,800,0.12f,0.12f,0.13f); gl.glPopMatrix();
-                          // MAIN ROAD - كورنيش طنجة 12 متر
-                          gl.glPushMatrix(); gl.glTranslatef(0,-0.75f,0); drawCube(gl,14,0.1f,800,0.20f,0.20f,0.21f); gl.glPopMatrix();
-                          // ROAD LINES
-                          for(int i=-80;i<80;i++){ gl.glPushMatrix(); gl.glTranslatef(0,-0.65f,i*6); drawCube(gl,0.3f,0.02f,2.5f,0.95f,0.95f,0.9f); gl.glPopMatrix(); }
-                          // SEA - بحر طنجة على اليمين
-                          gl.glPushMatrix(); gl.glTranslatef(100,-1.2f,0); drawCube(gl,300,0.5f,800,0.1f,0.45f,0.75f); gl.glPopMatrix();
-                          // BEACH - شاطئ
-                          gl.glPushMatrix(); gl.glTranslatef(50,-0.9f,0); drawCube(gl,20,0.1f,800,0.76f,0.7f,0.5f); gl.glPopMatrix();
-                          // BUILDINGS - بنايات طنجة الحقيقية
-                          for(float[] bd:buildings){
-                              gl.glPushMatrix(); gl.glTranslatef(bd[0],bd[2]/2-0.5f,bd[1]);
-                              float bright = 0.6f + (bd[2]/30f);
-                              drawCube(gl,6,bd[2],6,bright*0.7f,bright*0.75f,bright*0.85f);
-                              // نوافذ زرقاء - اضاءة
-                              gl.glTranslatef(0,bd[2]*0.1f,0.1f);
-                              for(int f=0; f<(int)(bd[2]/2); f++){
-                                  gl.glPushMatrix(); gl.glTranslatef(0,f*2,0); drawCube(gl,6.1f,0.4f,0.3f,0.15f,0.35f,0.9f); gl.glPopMatrix();
-                              }
-                              gl.glPopMatrix();
-                          }
-                          // PALMS - نخل كورنيش
-                          for(int i=-8;i<=8;i++){ if(i==0) continue; gl.glPushMatrix(); gl.glTranslatef(i*14,0.5f,30); drawCube(gl,0.25f,2.5f,0.25f,0.35f,0.18f,0.08f); gl.glTranslatef(0,2.2f,0); drawCube(gl,2f,1.8f,2f,0.08f,0.55f,0.12f); gl.glPopMatrix(); }
-                          // PLAYER / CAR
-                          gl.glPushMatrix(); gl.glTranslatef(carX, onFoot?0.9f:-0.15f, carZ); if(!onFoot) gl.glRotatef(carRot,0,1,0);
-                          if(onFoot){
-                              // شخصية Youssef - على الرجلين
-                              drawCube(gl,0.6f,0.9f,0.35f,0.1f,0.6f); // جلباب ازرق
-                              gl.glTranslatef(0,0.8f,0); drawCube(gl,0.35f,0.35f,0.35f,0.9f,0.75f,0.6f); // راس
-                          } else {
-                              float r=0.9f,gc=0.05f,bl=0.05f; if(curCar==0){r=1f;gc=0.85f;bl=0.05f;} else if(curCar==2){r=0.05f;gc=0.4f;bl=0.9f;}
-                              drawCube(gl,1.9f,0.65f,3.4f,r,gc,bl); gl.glTranslatef(0,0.55f,0.15f); drawCube(gl,1.5f,0.45f,1.6f,0.08f,0.12f,0.65f);
-                          }
-                          gl.glPopMatrix();
-                          // POLICE CAR - بوليس كيتبعك
-                          if(speed>50 &&!onFoot){
-                              gl.glPushMatrix(); gl.glTranslatef(carX-12, -0.15f, carZ-15); gl.glRotatef(carRot+10,0,1,0);
-                              drawCube(gl,1.8f,0.6f,3.2f,1f,1f,1f); gl.glTranslatef(0,0.3f,0); drawCube(gl,1.81f,0.15f,1f,0f,0.9f); // شريط ازرق
-                              gl.glPopMatrix();
-                          }
-                      }
-                      void drawCube(GL10 gl,float sx,float sy,float sz,float r,float g,float b){ gl.glColor4f(r,g,b,1); gl.glPushMatrix(); gl.glScalef(sx,sy,sz); gl.glEnableClientState(GL10.GL_VERTEX_ARRAY); gl.glVertexPointer(3,GL10.GL_FLOAT,0,cube); for(int i=0;i<6;i++) gl.glDrawArrays(GL10.GL_TRIANGLE_STRIP,i*4,4); gl.glDisableClientState(GL10.GL_VERTEX_ARRAY); gl.glPopMatrix(); }
+              @Override protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  GLSurfaceView v = new GLSurfaceView(this);
+                  v.setRenderer(new GLSurfaceView.Renderer() {
+                      public void onSurfaceCreated(javax.microedition.khronos.opengles.GL10 gl, javax.microedition.khronos.egl.EGLConfig c) { gl.glClearColor(0.2f, 0.6f, 1f, 1f); }
+                      public void onSurfaceChanged(javax.microedition.khronos.opengles.GL10 gl, int w, int h) { gl.glViewport(0, 0, w, h); }
+                      public void onDrawFrame(javax.microedition.khronos.opengles.GL10 gl) { gl.glClear(16640); }
                   });
-                  hud = new TextView(this); hud.setTextColor(Color.WHITE); hud.setTextSize(10); hud.setText("GTA v6.3 REAL CITY TANGIER\n"+realIP+":7777\nMARINA+CORNICHE+SEA");
-                  speedText = new TextView(this); speedText.setTextColor(Color.YELLOW); speedText.setTextSize(26); speedText.setText("0 KM/H");
-                  carNameText = new TextView(this); carNameText.setTextColor(Color.CYAN); carNameText.setTextSize(13); carNameText.setText("MERCEDES AMG GT - TANGIER");
-                  Button btnGas = new Button(this); btnGas.setText("▲ GAS / WALK"); btnGas.setBackgroundColor(Color.argb(200,0,230,0));
-                  Button btnBrake = new Button(this); btnBrake.setText("▼ BRAKE"); btnBrake.setBackgroundColor(Color.argb(200,230,0,0));
-                  Button btnLeft = new Button(this); btnLeft.setText("◀ LEFT"); btnLeft.setBackgroundColor(Color.argb(200,230,230,0));
-                  Button btnRight = new Button(this); btnRight.setText("RIGHT ▶"); btnRight.setBackgroundColor(Color.argb(200,230,230,0));
-                  btnGas.setOnTouchListener((v,e)->{ gas = e.getAction()!=MotionEvent.ACTION_UP && e.getAction()!=MotionEvent.ACTION_CANCEL; return true; });
-                  btnBrake.setOnTouchListener((v,e)->{ brake = e.getAction()!=MotionEvent.ACTION_UP && e.getAction()!=MotionEvent.ACTION_CANCEL; return true; });
-                  btnLeft.setOnTouchListener((v,e)->{ left = e.getAction()!=MotionEvent.ACTION_UP && e.getAction()!=MotionEvent.ACTION_CANCEL; return true; });
-                  btnRight.setOnTouchListener((v,e)->{ right = e.getAction()!=MotionEvent.ACTION_UP && e.getAction()!=MotionEvent.ACTION_CANCEL; return true; });
-                  LinearLayout mpRow = new LinearLayout(this); mpRow.setOrientation(LinearLayout.HORIZONTAL);
-                  Button hostBtn = new Button(this); hostBtn.setText("HOST"); Button joinBtn = new Button(this); joinBtn.setText("JOIN"); EditText ipInput = new EditText(this); ipInput.setText(realIP); ipInput.setBackgroundColor(Color.WHITE); ipInput.setTextColor(Color.BLACK); ipInput.setWidth(200);
-                  Button carBtn = new Button(this); carBtn.setText("CAR"); carBtn.setBackgroundColor(Color.argb(200,0,200,200));
-                  Button footBtn = new Button(this); footBtn.setText("YOUSSEF"); footBtn.setBackgroundColor(Color.argb(200,100,100,255));
-                  carBtn.setOnClickListener(v->{ curCar=(curCar+1)%3; NativeSwitchVehicle(curCar); carNameText.setText(carNames[curCar]); Toast.makeText(this,"Car: "+carNames[curCar],Toast.LENGTH_SHORT).show(); });
-                  footBtn.setOnClickListener(v->{ NativeToggleFoot(); boolean onFoot=NativeIsOnFoot(); Toast.makeText(this,onFoot?"Youssef خرج من السيارة - Walk!":"رجع للسيارة!",Toast.LENGTH_SHORT).show(); carNameText.setText(onFoot?"YOUSSEF EL ALAMI - ON FOOT":carNames[curCar]); });
-                  hostBtn.setOnClickListener(v->{ NativeStartHost(); realIP=getRealWifiIP(); hud.setText("HOSTING!\nIP: "+realIP+":7777\nTANGIER REAL CITY"); Toast.makeText(this,"HOST: "+realIP,Toast.LENGTH_LONG).show(); });
-                  joinBtn.setOnClickListener(v->{ String ip=ipInput.getText().toString(); NativeJoinHost(ip); hud.setText("JOINED: "+ip+"\nTANGIER"); });
-                  mpRow.addView(hostBtn); mpRow.addView(joinBtn); mpRow.addView(ipInput); mpRow.addView(carBtn); mpRow.addView(footBtn);
-                  FrameLayout root = new FrameLayout(this); root.addView(glView);
-                  FrameLayout.LayoutParams lpHud = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT); lpHud.leftMargin=10; lpHud.topMargin=10; root.addView(hud,lpHud);
-                  FrameLayout.LayoutParams lpSpeed = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT); lpSpeed.leftMargin=10; lpSpeed.topMargin=130; root.addView(speedText,lpSpeed);
-                  FrameLayout.LayoutParams lpCar = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT); lpCar.leftMargin=10; lpCar.topMargin=165; root.addView(carNameText,lpCar);
-                  FrameLayout.LayoutParams lpMp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 120); lpMp.topMargin=200; root.addView(mpRow,lpMp);
-                  LinearLayout bottom = new LinearLayout(this); bottom.setOrientation(LinearLayout.HORIZONTAL);
-                  LinearLayout leftCol = new LinearLayout(this); leftCol.setOrientation(LinearLayout.VERTICAL); leftCol.addView(btnGas); leftCol.addView(btnBrake);
-                  LinearLayout rightCol = new LinearLayout(this); rightCol.setOrientation(LinearLayout.HORIZONTAL); rightCol.addView(btnLeft); rightCol.addView(btnRight);
-                  bottom.addView(leftCol); bottom.addView(rightCol);
-                  FrameLayout.LayoutParams lpControls = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 280); lpControls.gravity=android.view.Gravity.BOTTOM; root.addView(bottom,lpControls);
-                  setContentView(root);
+                  setContentView(v);
               }
           }
           ENDOFFILE
-      - name: Build REAL CITY
+      - name: Build MINIMAL
         run: |
           rm -rf gradlew gradle/wrapper
           gradle assembleDebug
       - uses: actions/upload-artifact@v4
-        with: { name: GTA-v63-REAL-CITY-TANGIER, path: app/build/outputs/apk/debug/*.apk }
+        with: { name: GTA-v634-MINIMAL-SKY, path: app/build/outputs/apk/debug/*.apk }
