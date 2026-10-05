@@ -8,7 +8,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { java-version: '17', distribution: 'temurin' }
       - uses: android-actions/setup-android@v4
-      - name: Create GTA Tangier City
+      - name: Create GTA Tangier City FIXED
         run: |
           mkdir -p app/src/main/java/com/turrinistudio/gtav
           cat > settings.gradle.kts << 'EOF'
@@ -29,8 +29,8 @@ jobs:
                   applicationId = "com.turrinistudio.gtav"
                   minSdk = 21
                   targetSdk = 33
-                  versionCode = 7
-                  versionName = "0.7-City"
+                  versionCode = 8
+                  versionName = "0.8-FIXED"
               }
           }
           EOF
@@ -44,7 +44,7 @@ jobs:
               </application>
           </manifest>
           EOF
-          cat > app/src/main/java/com/turrinistudio/gtav/MainActivity.java << 'EOF'
+          cat > app/src/main/java/com/turrinistudio/gtav/MainActivity.java << 'ENDOFFILE'
           package com.turrinistudio.gtav;
           import android.app.Activity;
           import android.opengl.GLSurfaceView;
@@ -54,19 +54,35 @@ jobs:
           import android.view.MotionEvent;
           import javax.microedition.khronos.egl.EGLConfig;
           import javax.microedition.khronos.opengles.GL10;
+          import java.nio.ByteBuffer;
+          import java.nio.ByteOrder;
+          import java.nio.FloatBuffer;
 
           public class MainActivity extends Activity {
               float carX=0, carZ=0, carRot=0, speed=0;
-              boolean gas=false, brake=false, l=false, r=false;
+              boolean gas=false, brake=false, left=false, right=false;
 
               @Override
               protected void onCreate(Bundle b) {
                   super.onCreate(b);
                   GLSurfaceView glView = new GLSurfaceView(this);
                   glView.setRenderer(new GLSurfaceView.Renderer() {
+                      FloatBuffer buf;
                       public void onSurfaceCreated(GL10 gl, EGLConfig c) {
                           gl.glClearColor(0.18f, 0.55f, 0.95f, 1f);
                           gl.glEnable(GL10.GL_DEPTH_TEST);
+                          float[] v = {
+                              -0.5f,-0.5f,0.5f, 0.5f,-0.5f,0.5f, -0.5f,0.5f,0.5f, 0.5f,0.5f,0.5f,
+                              0.5f,-0.5f,-0.5f, -0.5f,-0.5f,-0.5f, 0.5f,0.5f,-0.5f, -0.5f,0.5f,-0.5f,
+                              -0.5f,-0.5f,-0.5f, -0.5f,-0.5f,0.5f, -0.5f,0.5f,-0.5f, -0.5f,0.5f,0.5f,
+                              0.5f,-0.5f,0.5f, 0.5f,-0.5f,-0.5f, 0.5f,0.5f,0.5f, 0.5f,0.5f,-0.5f,
+                              -0.5f,0.5f,0.5f, 0.5f,0.5f,0.5f, -0.5f,0.5f,-0.5f, 0.5f,0.5f,-0.5f,
+                              -0.5f,-0.5f,-0.5f, 0.5f,-0.5f,-0.5f, -0.5f,-0.5f,0.5f, 0.5f,-0.5f,0.5f
+                          };
+                          ByteBuffer bb = ByteBuffer.allocateDirect(v.length*4);
+                          bb.order(ByteOrder.nativeOrder());
+                          buf = bb.asFloatBuffer();
+                          buf.put(v); buf.position(0);
                       }
                       public void onSurfaceChanged(GL10 gl, int w, int h) {
                           gl.glViewport(0,0,w,h);
@@ -76,12 +92,15 @@ jobs:
                           gl.glFrustumf(-ratio, ratio, -1, 1, 1.5f, 100);
                       }
                       public void onDrawFrame(GL10 gl) {
-                          if(gas) speed+=0.015f; if(brake) speed-=0.02f;
-                          if(l) carRot+=2.5f; if(r) carRot-=2.5f;
-                          if(speed>0.4f) speed=0.4f; if(speed<-0.2f) speed=-0.2f;
+                          if(gas) speed+=0.015f;
+                          if(brake) speed-=0.02f;
+                          if(left) carRot+=2.5f;
+                          if(right) carRot-=2.5f;
+                          if(speed>0.4f) speed=0.4f;
+                          if(speed<-0.2f) speed=-0.2f;
                           speed*=0.985f;
-                          carX += Math.sin(Math.toRadians(carRot))*speed;
-                          carZ += Math.cos(Math.toRadians(carRot))*speed;
+                          carX += (float)Math.sin(Math.toRadians(carRot))*speed;
+                          carZ += (float)Math.cos(Math.toRadians(carRot))*speed;
 
                           gl.glClear(GL10.GL_COLOR_BUFFER_BIT|GL10.GL_DEPTH_BUFFER_BIT);
                           gl.glMatrixMode(GL10.GL_MODELVIEW);
@@ -91,67 +110,48 @@ jobs:
                           gl.glRotatef(-carRot,0,1,0);
                           gl.glTranslatef(-carX, 0, -carZ);
 
-                          // Road
                           gl.glPushMatrix();
                           gl.glTranslatef(0,-0.5f,0);
                           drawCube(gl, 100,0.2f,100, 0.15f,0.15f,0.15f);
                           gl.glPopMatrix();
-                          // Road lines
+
                           gl.glPushMatrix();
                           gl.glTranslatef(0,-0.39f,0);
-                          drawCube(gl, 0.5f,0.01f,100, 1f,1f,1f);
+                          drawCube(gl, 0.5f,0.02f,100, 1f,1f,0.2f);
                           gl.glPopMatrix();
 
-                          // Buildings Tangier style
-                          for(int i=-5;i<5;i++){
-                              for(int j=-5;j<5;j++){
+                          for(int i=-5;i<=5;i++){
+                              for(int j=-5;j<=5;j++){
                                   if(i==0 && j==0) continue;
-                                  float bx=i*8 + (float)Math.random()*0.5f;
-                                  float bz=j*8;
-                                  float h = 2 + (Math.abs(i*j)%4);
+                                  float bx=i*8; float bz=j*8;
+                                  float h = 2 + (Math.abs(i*3+j*7)%5);
                                   gl.glPushMatrix();
                                   gl.glTranslatef(bx, h/2-0.5f, bz);
-                                  float cr=0.8f+(i%3)*0.05f, cg=0.8f+(j%2)*0.05f, cb=0.7f;
-                                  drawCube(gl, 2, h, 2, cr,cg,cb);
+                                  drawCube(gl, 2.5f, h, 2.5f, 0.85f, 0.85f, 0.75f);
                                   gl.glPopMatrix();
                               }
                           }
 
-                          // CAR - fixed full body
                           gl.glPushMatrix();
                           gl.glTranslatef(carX, 0.2f, carZ);
                           gl.glRotatef(carRot,0,1,0);
-                          // body
                           drawCube(gl, 1.2f,0.5f,2.2f, 0.95f,0.05f,0.05f);
-                          // roof
-                          gl.glPushMatrix();
-                          gl.glTranslatef(0,0.5f,-0.2f);
-                          drawCube(gl, 1f,0.4f,1f, 0.7f,0.05f,0.05f);
-                          gl.glPopMatrix();
-                          // wheels
-                          gl.glPushMatrix(); gl.glTranslatef(-0.6f,-0.3f,0.7f); drawCube(gl,0.2f,0.3f,0.4f,0.1f,0.1f,0.1f); gl.glPopMatrix();
-                          gl.glPushMatrix(); gl.glTranslatef(0.6f,-0.3f,0.7f); drawCube(gl,0.2f,0.3f,0.4f,0.1f,0.1f,0.1f); gl.glPopMatrix();
-                          gl.glPushMatrix(); gl.glTranslatef(-0.6f,-0.3f,-0.7f); drawCube(gl,0.2f,0.3f,0.4f,0.1f,0.1f,0.1f); gl.glPopMatrix();
-                          gl.glPushMatrix(); gl.glTranslatef(0.6f,-0.3f,-0.7f); drawCube(gl,0.2f,0.3f,0.4f,0.1f,0.1f,0.1f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(0,0.5f,-0.2f); drawCube(gl, 1f,0.4f,1f, 0.6f,0.05f,0.05f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(-0.65f,-0.3f,0.7f); drawCube(gl,0.2f,0.3f,0.4f,0.1f,0.1f,0.1f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(0.65f,-0.3f,0.7f); drawCube(gl,0.2f,0.3f,0.4f,0.1f,0.1f,0.1f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(-0.65f,-0.3f,-0.7f); drawCube(gl,0.2f,0.3f,0.4f,0.1f,0.1f,0.1f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(0.65f,-0.3f,-0.7f); drawCube(gl,0.2f,0.3f,0.4f,0.1f,0.1f,0.1f); gl.glPopMatrix();
                           gl.glPopMatrix();
                       }
                       void drawCube(GL10 gl, float sx, float sy, float sz, float r, float g, float b){
                           gl.glColor4f(r,g,b,1);
-                          float x=sx/2, y=sy/2, z=sz/2;
-                          gl.glBegin(GL10.GL_TRIANGLE_STRIP);
-                          // front
-                          gl.glVertex3f(-x,-y,z); gl.glVertex3f(x,-y,z); gl.glVertex3f(-x,y,z); gl.glVertex3f(x,y,z);
-                          // back
-                          gl.glVertex3f(x,y,-z); gl.glVertex3f(x,-y,-z); gl.glVertex3f(-x,y,-z); gl.glVertex3f(-x,-y,-z);
-                          // left
-                          gl.glVertex3f(-x,-y,-z); gl.glVertex3f(-x,-y,z); gl.glVertex3f(-x,y,-z); gl.glVertex3f(-x,y,z);
-                          // right
-                          gl.glVertex3f(x,y,z); gl.glVertex3f(x,-y,z); gl.glVertex3f(x,y,-z); gl.glVertex3f(x,-y,-z);
-                          // top
-                          gl.glVertex3f(-x,y,z); gl.glVertex3f(x,y,z); gl.glVertex3f(-x,y,-z); gl.glVertex3f(x,y,-z);
-                          // bottom
-                          gl.glVertex3f(-x,-y,-z); gl.glVertex3f(x,-y,-z); gl.glVertex3f(-x,-y,z); gl.glVertex3f(x,-y,z);
-                          gl.glEnd();
+                          gl.glPushMatrix();
+                          gl.glScalef(sx, sy, sz);
+                          gl.glEnableClientState(GL10.GL_VERTEX_ARRAY);
+                          gl.glVertexPointer(3, GL10.GL_FLOAT, 0, buf);
+                          for(int i=0;i<6;i++) gl.glDrawArrays(GL10.GL_TRIANGLE_STRIP, i*4, 4);
+                          gl.glDisableClientState(GL10.GL_VERTEX_ARRAY);
+                          gl.glPopMatrix();
                       }
                   });
 
@@ -161,14 +161,14 @@ jobs:
                           boolean down=e.getAction()!=MotionEvent.ACTION_UP;
                           gas = down && x < w*0.3f && y < h*0.6f;
                           brake = down && x < w*0.3f && y >= h*0.6f;
-                          l = down && x > w*0.7f && x < w*0.85f;
-                          r = down && x >= w*0.85f;
+                          left = down && x > w*0.7f && x < w*0.85f;
+                          right = down && x >= w*0.85f;
                           return true;
                       }
                   };
-                  hud.setText("GTA MOROCCO v0.7\nTANGIER CITY - 20 Buildings\n\n[GAS - top left]\n[BRAKE - bottom left]\n[◀ ▶ - right side]\nSpeed: "+String.format("%.0f", Math.abs(speed*200))+" km/h");
+                  hud.setText("GTA MOROCCO v0.8 FIXED\nTANGIER CITY\n[GAS top-left] [BRAKE bottom-left]\n[<- -> right side]");
                   hud.setTextColor(0xFFFFFFFF);
-                  hud.setTextSize(11);
+                  hud.setTextSize(12);
                   hud.setPadding(20,20,20,20);
 
                   FrameLayout layout=new FrameLayout(this);
@@ -177,11 +177,11 @@ jobs:
                   setContentView(layout);
               }
           }
-          EOF
+          ENDOFFILE
       - uses: gradle/actions/setup-gradle@v3
         with: { gradle-version: 8.4 }
       - run: |
           rm -rf gradlew gradle/wrapper
           gradle assembleDebug
       - uses: actions/upload-artifact@v4
-        with: { name: GTA-TANGIER-CITY, path: app/build/outputs/apk/debug/*.apk }
+        with: { name: GTA-TANGIER-FIXED, path: app/build/outputs/apk/debug/*.apk }
