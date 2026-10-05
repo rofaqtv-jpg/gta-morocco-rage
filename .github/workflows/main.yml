@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { java-version: '17', distribution: 'temurin' }
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - uses: nttld/setup-ndk@v1
         with: { ndk-version: r26d, link-to-sdk: true }
       - name: Create Project
