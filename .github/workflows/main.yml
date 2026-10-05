@@ -9,7 +9,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - name: Create MINIMAL Project (100% works)
         run: |
           mkdir -p app/src/main/java/com/turrinistudio/gtav
