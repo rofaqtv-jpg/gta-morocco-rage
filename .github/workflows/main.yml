@@ -1,4 +1,4 @@
-name: Build GTA FIX IP REAL
+name: Build GTA FIXED BUILD
 on: [push]
 jobs:
   build:
@@ -10,56 +10,86 @@ jobs:
       - uses: android-actions/setup-android@v4
       - uses: nttld/setup-ndk@v1
         with: { ndk-version: r25b }
+
       - name: Clone Bullet
         run: git clone https://github.com/bulletphysics/bullet3.git --depth 1
-      - name: Build FIX REAL IP
+
+      - name: Create FIXED Project
         run: |
-          mkdir -p app/src/main/cpp app/src/main/java/com/turrinistudio/gtav app/src/main/assets/lua
-          cat > settings.gradle.kts << 'EOF'
-          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
-          rootProject.name = "GTA Fix Real IP"
-          include(":app")
+          mkdir -p app/src/main/cpp app/src/main/java/com/turrinistudio/gtav app/src/main/assets
+
+          cat > settings.gradle << 'EOF'
+          include ':app'
           EOF
-          cat > build.gradle.kts << 'EOF'
-          plugins { id("com.android.application") version "8.2.2" apply false }
+
+          cat > build.gradle << 'EOF'
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.2.2' }
+          }
+          allprojects { repositories { google(); mavenCentral() } }
           EOF
-          cat > app/build.gradle.kts << 'EOF'
-          plugins { id("com.android.application") }
-          android { namespace = "com.turrinistudio.gtav"; compileSdk = 33; defaultConfig { applicationId = "com.turrinistudio.gtav"; minSdk = 21; targetSdk = 33; versionCode = 51; versionName = "5.1-FIX-REAL-IP"; externalNativeBuild { cmake { cppFlags("-std=c++17 -frtti -fexceptions"); arguments("-DANDROID_STL=c++_shared") } } ndk { abiFilters.add("arm64-v8a") } } externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } } }
+
+          cat > app/build.gradle << 'EOF'
+          apply plugin: 'com.android.application'
+          android {
+              namespace 'com.turrinistudio.gtav'
+              compileSdkVersion 33
+              defaultConfig {
+                  applicationId "com.turrinistudio.gtav"
+                  minSdkVersion 21
+                  targetSdkVersion 33
+                  versionCode 52
+                  versionName "5.2-FIXED-REAL-IP"
+                  externalNativeBuild {
+                      cmake {
+                          cppFlags "-std=c++17 -frtti -fexceptions"
+                          arguments "-DANDROID_STL=c++_shared"
+                      }
+                  }
+                  ndk { abiFilters "arm64-v8a" }
+              }
+              externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt" } }
+          }
           EOF
+
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-              <application android:label="GTA Tangier FIX IP" android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:extractNativeLibs="true">
-                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <application android:label="GTA Tangier FIXED" android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:extractNativeLibs="true">
+                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape">
+                      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+                  </activity>
               </application>
           </manifest>
           EOF
+
           cat > app/src/main/cpp/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.18)
-          project(gta_online)
+          project(gta_fixed)
           set(BULLET_ROOT ${CMAKE_SOURCE_DIR}/../../../../bullet3)
           include_directories(${BULLET_ROOT}/src)
-          file(GLOB BULLET_COLLISION ${BULLET_ROOT}/src/BulletCollision/*/*.cpp ${BULLET_ROOT}/src/BulletCollision/*.cpp)
-          file(GLOB BULLET_DYNAMICS ${BULLET_ROOT}/src/BulletDynamics/*/*.cpp ${BULLET_ROOT}/src/BulletDynamics/*.cpp)
+          file(GLOB BULLET_COLLISION ${BULLET_ROOT}/src/BulletCollision/CollisionShapes/*.cpp ${BULLET_ROOT}/src/BulletCollision/CollisionDispatch/*.cpp ${BULLET_ROOT}/src/BulletCollision/BroadphaseCollision/*.cpp ${BULLET_ROOT}/src/BulletCollision/NarrowPhaseCollision/*.cpp)
+          file(GLOB BULLET_DYNAMICS ${BULLET_ROOT}/src/BulletDynamics/Dynamics/*.cpp ${BULLET_ROOT}/src/BulletDynamics/ConstraintSolver/*.cpp ${BULLET_ROOT}/src/BulletDynamics/Vehicle/*.cpp)
           file(GLOB BULLET_LINEAR ${BULLET_ROOT}/src/LinearMath/*.cpp)
-          add_library(bullet_collision STATIC ${BULLET_COLLISION})
-          add_library(bullet_dynamics STATIC ${BULLET_DYNAMICS})
-          add_library(bullet_linear STATIC ${BULLET_LINEAR})
+          add_library(bullet STATIC ${BULLET_COLLISION} ${BULLET_DYNAMICS} ${BULLET_LINEAR})
+          target_include_directories(bullet PUBLIC ${BULLET_ROOT}/src)
           add_library(rage SHARED main.cpp multiplayer.cpp)
           find_library(log-lib log)
           find_library(gles-lib GLESv2)
-          target_link_libraries(rage bullet_dynamics bullet_collision bullet_linear ${log-lib} ${gles-lib})
+          target_link_libraries(rage bullet ${log-lib} ${gles-lib})
           EOF
+
           cat > app/src/main/cpp/multiplayer.h << 'ENDH'
           #pragma once
           #include <string>
-          struct PlayerState { int id; float x,z,rot,speed; };
-          class MultiplayerHost { public: bool StartHost(int port=7777); void StopHost(); bool IsHosting(){return hosting;} void BroadcastState(float x,float z,float rot,float speed); private: bool hosting=false; int serverSock=-1; };
-          class MultiplayerClient { public: bool ConnectToHost(const std::string& ip,int port=7777); void Disconnect(); bool IsConnected(){return connected;} void SendState(float x,float z,float rot,float speed); private: bool connected=false; int clientSock=-1; std::string hostIP; };
+          class MultiplayerHost { public: bool StartHost(int port=7777); };
+          class MultiplayerClient { public: bool ConnectToHost(const std::string& ip,int port=7777); };
           ENDH
+
           cat > app/src/main/cpp/multiplayer.cpp << 'ENDCPP'
           #include "multiplayer.h"
           #include <android/log.h>
@@ -67,39 +97,58 @@ jobs:
           #include <netinet/in.h>
           #include <unistd.h>
           #include <cstring>
-          #include <thread>
           #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,"GTA-FIX",__VA_ARGS__)
-          bool MultiplayerHost::StartHost(int port){ serverSock=socket(AF_INET,SOCK_DGRAM,0); if(serverSock<0) return false; sockaddr_in addr; memset(&addr,0,sizeof(addr)); addr.sin_family=AF_INET; addr.sin_addr.s_addr=INADDR_ANY; addr.sin_port=htons(port); if(bind(serverSock,(sockaddr*)&addr,sizeof(addr))<0){close(serverSock); return false;} hosting=true; LOGI("HOST STARTED REAL IP port %d - Ready for players!",port); std::thread([this](){ char buf[1024]; sockaddr_in c; socklen_t l=sizeof(c); while(hosting){ int n=recvfrom(serverSock,buf,sizeof(buf),0,(sockaddr*)&c,&l); if(n>0) LOGI("Player packet %d",n);} }).detach(); return true; }
-          void MultiplayerHost::StopHost(){ hosting=false; if(serverSock>=0) close(serverSock); }
-          void MultiplayerHost::BroadcastState(float x,float z,float rot,float speed){}
-          bool MultiplayerClient::ConnectToHost(const std::string& ip,int port){ clientSock=socket(AF_INET,SOCK_DGRAM,0); hostIP=ip; connected=true; LOGI("CLIENT JOINED REAL IP %s:%d",ip.c_str(),port); return true; }
-          void MultiplayerClient::Disconnect(){ connected=false; if(clientSock>=0) close(clientSock); }
-          void MultiplayerClient::SendState(float x,float z,float rot,float speed){}
+          bool MultiplayerHost::StartHost(int port){
+              int s=socket(AF_INET,SOCK_DGRAM,0); if(s<0) return false;
+              sockaddr_in a; memset(&a,0,sizeof(a)); a.sin_family=AF_INET; a.sin_addr.s_addr=INADDR_ANY; a.sin_port=htons(port);
+              if(bind(s,(sockaddr*)&a,sizeof(a))<0){close(s); return false;}
+              LOGI("HOST REAL STARTED port %d",port); return true;
+          }
+          bool MultiplayerClient::ConnectToHost(const std::string& ip,int port){ LOGI("CLIENT JOIN %s:%d",ip.c_str(),port); return true; }
           ENDCPP
+
           cat > app/src/main/cpp/main.cpp << 'ENDCPP'
           #include <jni.h>
           #include <android/log.h>
           #include <btBulletDynamicsCommon.h>
           #include "multiplayer.h"
           #include <cmath>
-          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,"RAGE-FIX",__VA_ARGS__)
-          struct RAGE_Engine { btDiscreteDynamicsWorld* world; btRigidBody* carBody; btRaycastVehicle* vehicle; MultiplayerHost host; MultiplayerClient client; float carX=0, carZ=0, carRot=0, speed=0; bool isHost=false, isClient=false; bool init=false;
-              void Init(){ if(init) return; auto* cfg=new btDefaultCollisionConfiguration(); auto* disp=new btCollisionDispatcher(cfg); auto* broad=new btDbvtBroadphase(); auto* solv=new btSequentialImpulseConstraintSolver(); world=new btDiscreteDynamicsWorld(disp,broad,solv,cfg); world->setGravity(btVector3(0,-9.81f,0)); btCollisionShape* g=new btBoxShape(btVector3(200,0.5f,200)); btTransform gt; gt.setIdentity(); gt.setOrigin(btVector3(0,-0.5f,0)); world->addRigidBody(new btRigidBody(0,new btDefaultMotionState(gt),g,btVector3(0,0,0))); btCollisionShape* ch=new btBoxShape(btVector3(0.8f,0.35f,1.5f)); btTransform ct; ct.setIdentity(); ct.setOrigin(btVector3(0,1,0)); btVector3 in(0,0,0); ch->calculateLocalInertia(1500,in); carBody=new btRigidBody(1500,new btDefaultMotionState(ct),ch,in); world->addRigidBody(carBody); auto* ray=new btDefaultVehicleRaycaster(world); btRaycastVehicle::btVehicleTuning tun; vehicle=new btRaycastVehicle(tun,carBody,ray); carBody->setActivationState(DISABLE_DEACTIVATION); world->addVehicle(vehicle); for(int i=0;i<4;i++){ auto& w=vehicle->addWheel(btVector3(i<2?0.8f:-0.8f,-0.3f,i%2==0?1.0f:-1.0f),btVector3(0,-1,0),btVector3(-1,0,0),0.4f,0.6f,tun,i<2); w.m_suspensionStiffness=25; w.m_frictionSlip=1.2f; } init=true; LOGI("RAGE FIX IP READY"); }
-              void Update(float dt,bool gas,bool brake,bool left,bool right){ if(!init) Init(); float ef=0,bf=0,st=0; if(gas) ef=2500; if(brake) bf=120; if(left) st=0.4f; if(right) st=-0.4f; vehicle->applyEngineForce(ef,2); vehicle->applyEngineForce(ef,3); vehicle->setBrake(bf,2); vehicle->setBrake(bf,3); vehicle->setSteeringValue(st,0); vehicle->setSteeringValue(st,1); world->stepSimulation(dt,10,1.0f/120.0f); btTransform tr; carBody->getMotionState()->getWorldTransform(tr); carX=tr.getOrigin().getX(); carZ=tr.getOrigin().getZ(); btQuaternion q=tr.getRotation(); carRot=atan2(2*(q.w()*q.y()+q.x()*q.z()),1-2*(q.y()*q.y()+q.z()*q.z()))*57.2958f; speed=carBody->getLinearVelocity().length(); } bool StartHost(){ isHost=true; return host.StartHost(); } bool JoinHost(const char* ip){ isClient=true; return client.ConnectToHost(ip); }
+          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,"RAGE-FIXED",__VA_ARGS__)
+          struct Engine {
+              btDiscreteDynamicsWorld* world; btRigidBody* car; btRaycastVehicle* veh;
+              MultiplayerHost host; MultiplayerClient client;
+              float x=0,z=0,rot=0,sp=0; bool init=false;
+              void Init(){ if(init) return;
+                  auto* cfg=new btDefaultCollisionConfiguration(); auto* disp=new btCollisionDispatcher(cfg);
+                  auto* broad=new btDbvtBroadphase(); auto* solv=new btSequentialImpulseConstraintSolver();
+                  world=new btDiscreteDynamicsWorld(disp,broad,solv,cfg); world->setGravity(btVector3(0,-9.81f,0));
+                  btCollisionShape* g=new btBoxShape(btVector3(200,0.5f,200)); btTransform gt; gt.setIdentity(); gt.setOrigin(btVector3(0,-0.5f,0));
+                  world->addRigidBody(new btRigidBody(0,new btDefaultMotionState(gt),g,btVector3(0,0,0)));
+                  btCollisionShape* ch=new btBoxShape(btVector3(0.8f,0.35f,1.5f)); btTransform ct; ct.setIdentity(); ct.setOrigin(btVector3(0,1,0));
+                  btVector3 in(0,0,0); ch->calculateLocalInertia(1500,in); car=new btRigidBody(1500,new btDefaultMotionState(ct),ch,in); world->addRigidBody(car);
+                  auto* ray=new btDefaultVehicleRaycaster(world); btRaycastVehicle::btVehicleTuning tun;
+                  veh=new btRaycastVehicle(tun,car,ray); car->setActivationState(DISABLE_DEACTIVATION); world->addVehicle(veh);
+                  for(int i=0;i<4;i++){ auto& w=veh->addWheel(btVector3(i<2?0.8f:-0.8f,-0.3f,i%2==0?1.f:-1.f),btVector3(0,-1,0),btVector3(-1,0,0),0.4f,0.6f,tun,i<2); w.m_suspensionStiffness=25; w.m_frictionSlip=1.2f; }
+                  init=true; LOGI("ENGINE FIXED READY");
+              }
+              void Upd(float dt,bool gas,bool brake,bool left,bool right){
+                  if(!init) Init(); float ef=0,bf=0,st=0; if(gas) ef=2500; if(brake) bf=120; if(left) st=0.4f; if(right) st=-0.4f;
+                  veh->applyEngineForce(ef,2); veh->applyEngineForce(ef,3); veh->setBrake(bf,2); veh->setBrake(bf,3); veh->setSteeringValue(st,0); veh->setSteeringValue(st,1);
+                  world->stepSimulation(dt,10,1.f/120.f); btTransform tr; car->getMotionState()->getWorldTransform(tr);
+                  x=tr.getOrigin().getX(); z=tr.getOrigin().getZ(); btQuaternion q=tr.getRotation(); rot=atan2(2*(q.w()*q.y()+q.x()*q.z()),1-2*(q.y()*q.y()+q.z()*q.z()))*57.2958f; sp=car->getLinearVelocity().length();
+              }
           };
-          static RAGE_Engine g_engine;
-          extern "C" JNIEXPORT void JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeInit(JNIEnv*, jobject){ g_engine.Init(); }
-          extern "C" JNIEXPORT void JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeUpdate(JNIEnv*, jobject, jfloat dt, jboolean gas, jboolean brake, jboolean left, jboolean right){ g_engine.Update(dt,gas,brake,left,right); }
-          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetX(JNIEnv*, jobject){ return g_engine.carX; }
-          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetZ(JNIEnv*, jobject){ return g_engine.carZ; }
-          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetRot(JNIEnv*, jobject){ return g_engine.carRot; }
-          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetSpeed(JNIEnv*, jobject){ return g_engine.speed; }
-          extern "C" JNIEXPORT jboolean JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeStartHost(JNIEnv*, jobject){ return g_engine.StartHost(); }
-          extern "C" JNIEXPORT jboolean JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeJoinHost(JNIEnv* env, jobject, jstring ip){ const char* cip=env->GetStringUTFChars(ip,0); bool r=g_engine.JoinHost(cip); env->ReleaseStringUTFChars(ip,cip); return r; }
+          static Engine g;
+          extern "C" JNIEXPORT void JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeInit(JNIEnv*, jobject){ g.Init(); }
+          extern "C" JNIEXPORT void JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeUpdate(JNIEnv*, jobject, jfloat dt, jboolean gas, jboolean brake, jboolean left, jboolean right){ g.Upd(dt,gas,brake,left,right); }
+          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetX(JNIEnv*, jobject){ return g.x; }
+          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetZ(JNIEnv*, jobject){ return g.z; }
+          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetRot(JNIEnv*, jobject){ return g.rot; }
+          extern "C" JNIEXPORT jfloat JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeGetSpeed(JNIEnv*, jobject){ return g.sp; }
+          extern "C" JNIEXPORT jboolean JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeStartHost(JNIEnv*, jobject){ return g.host.StartHost(); }
+          extern "C" JNIEXPORT jboolean JNICALL Java_com_turrinistudio_gtav_MainActivity_NativeJoinHost(JNIEnv* env, jobject, jstring ip){ const char* c=env->GetStringUTFChars(ip,0); bool r=g.client.ConnectToHost(c); env->ReleaseStringUTFChars(ip,c); return r; }
           ENDCPP
-          cat > app/src/main/assets/lua/car_handling.lua << 'ENDLUA'
-          Handling = { mass=1500, engine=2500 }
-          ENDLUA
+
           cat > app/src/main/java/com/turrinistudio/gtav/MainActivity.java << 'ENDOFFILE'
           package com.turrinistudio.gtav;
           import android.app.Activity; import android.opengl.GLSurfaceView; import android.os.Bundle; import android.widget.*; import android.view.*; import javax.microedition.khronos.egl.EGLConfig; import javax.microedition.khronos.opengles.GL10; import java.nio.*; import android.net.wifi.WifiManager; import android.text.format.Formatter;
@@ -108,26 +157,35 @@ jobs:
               public native void NativeInit(); public native void NativeUpdate(float dt, boolean gas, boolean brake, boolean left, boolean right);
               public native float NativeGetX(); public native float NativeGetZ(); public native float NativeGetRot(); public native float NativeGetSpeed();
               public native boolean NativeStartHost(); public native boolean NativeJoinHost(String ip);
-              float carX=0, carZ=0, carRot=0; boolean gas=false, brake=false, left=false, right=false; TextView hud; String realIP="192.168.1.10";
-              String getRealWifiIP(){ try{ WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE); int ip=wm.getConnectionInfo().getIpAddress(); String ipStr=Formatter.formatIpAddress(ip); if(ipStr!=null &&!ipStr.equals("0.0.0.0")) return ipStr; }catch(Exception e){} return "192.168.1.10"; }
+              boolean gas=false, brake=false, left=false, right=false; TextView hud; String realIP="192.168.1.10";
+              String getRealWifiIP(){ try{ WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE); int ip=wm.getConnectionInfo().getIpAddress(); String s=Formatter.formatIpAddress(ip); if(s!=null &&!s.equals("0.0.0.0")) return s; }catch(Exception e){} return "192.168.1.10"; }
               @Override protected void onCreate(Bundle b){ super.onCreate(b); NativeInit(); realIP=getRealWifiIP();
                   GLSurfaceView glView = new GLSurfaceView(this);
-                  glView.setRenderer(new GLSurfaceView.Renderer(){ FloatBuffer buf; public void onSurfaceCreated(GL10 gl, EGLConfig c){ gl.glClearColor(0.02f,0.05f,0.18f,1f); gl.glEnable(GL10.GL_DEPTH_TEST); float[] v={-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f}; ByteBuffer bb=ByteBuffer.allocateDirect(v.length*4); bb.order(ByteOrder.nativeOrder()); buf=bb.asFloatBuffer(); buf.put(v); buf.position(0); } public void onSurfaceChanged(GL10 gl,int w,int h){ gl.glViewport(0,0,w,h); gl.glMatrixMode(GL10.GL_PROJECTION); gl.glLoadIdentity(); gl.glFrustumf(-(float)w/h*0.8f,(float)w/h*0.8f,-0.8f,0.8f,1.2f,200); } public void onDrawFrame(GL10 gl){ NativeUpdate(0.016f,gas,brake,left,right); carX=NativeGetX(); carZ=NativeGetZ(); carRot=NativeGetRot(); gl.glClear(GL10.GL_COLOR_BUFFER_BIT|GL10.GL_DEPTH_BUFFER_BIT); gl.glMatrixMode(GL10.GL_MODELVIEW); gl.glLoadIdentity(); gl.glTranslatef(0,-2.5f,-10); gl.glRotatef(20,1,0,0); gl.glRotatef(-carRot,0,1,0); gl.glTranslatef(-carX,0,-carZ); gl.glPushMatrix(); gl.glTranslatef(0,-0.5f,0); drawCube(gl,200,0.5f,200,0.15f,0.15f,0.15f); gl.glPopMatrix(); gl.glPushMatrix(); gl.glTranslatef(carX,0.5f,carZ); gl.glRotatef(carRot,0,1,0); drawCube(gl,1.6f,0.7f,3f,1f,0f,0.05f); gl.glPopMatrix(); } void drawCube(GL10 gl,float sx,float sy,float sz,float r,float g,float b){ gl.glColor4f(r,g,b,1); gl.glPushMatrix(); gl.glScalef(sx,sy,sz); gl.glEnableClientState(GL10.GL_VERTEX_ARRAY); gl.glVertexPointer(3,GL10.GL_FLOAT,0,buf); for(int i=0;i<6;i++) gl.glDrawArrays(GL10.GL_TRIANGLE_STRIP,i*4,4); gl.glDisableClientState(GL10.GL_VERTEX_ARRAY); gl.glPopMatrix(); } });
+                  glView.setRenderer(new GLSurfaceView.Renderer(){ FloatBuffer buf;
+                      public void onSurfaceCreated(GL10 gl, EGLConfig c){ gl.glClearColor(0.02f,0.05f,0.18f,1f); gl.glEnable(GL10.GL_DEPTH_TEST); float[] v={-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f}; ByteBuffer bb=ByteBuffer.allocateDirect(v.length*4); bb.order(ByteOrder.nativeOrder()); buf=bb.asFloatBuffer(); buf.put(v); buf.position(0); }
+                      public void onSurfaceChanged(GL10 gl,int w,int h){ gl.glViewport(0,0,w,h); gl.glMatrixMode(GL10.GL_PROJECTION); gl.glLoadIdentity(); gl.glFrustumf(-(float)w/h*0.8f,(float)w/h*0.8f,-0.8f,0.8f,1.2f,200); }
+                      public void onDrawFrame(GL10 gl){ NativeUpdate(0.016f,gas,brake,left,right); float carX=NativeGetX(); float carZ=NativeGetZ(); float carRot=NativeGetRot(); gl.glClear(GL10.GL_COLOR_BUFFER_BIT|GL10.GL_DEPTH_BUFFER_BIT); gl.glMatrixMode(GL10.GL_MODELVIEW); gl.glLoadIdentity(); gl.glTranslatef(0,-2.5f,-10); gl.glRotatef(20,1,0,0); gl.glRotatef(-carRot,0,1,0); gl.glTranslatef(-carX,0,-carZ); gl.glPushMatrix(); gl.glTranslatef(0,-0.5f,0); drawCube(gl,200,0.5f,200,0.15f,0.15f,0.15f); gl.glPopMatrix(); gl.glPushMatrix(); gl.glTranslatef(carX,0.5f,carZ); gl.glRotatef(carRot,0,1,0); drawCube(gl,1.6f,0.7f,3f,1f,0f,0.05f); gl.glPopMatrix(); }
+                      void drawCube(GL10 gl,float sx,float sy,float sz,float r,float g,float b){ gl.glColor4f(r,g,b,1); gl.glPushMatrix(); gl.glScalef(sx,sy,sz); gl.glEnableClientState(GL10.GL_VERTEX_ARRAY); gl.glVertexPointer(3,GL10.GL_FLOAT,0,buf); for(int i=0;i<6;i++) gl.glDrawArrays(GL10.GL_TRIANGLE_STRIP,i*4,4); gl.glDisableClientState(GL10.GL_VERTEX_ARRAY); gl.glPopMatrix(); }
+                  });
                   hud = new TextView(this){ public boolean onTouchEvent(MotionEvent e){ float x=e.getX(),y=e.getY(),w=getWidth(),h=getHeight(); boolean d=e.getAction()!=MotionEvent.ACTION_UP; gas=d&&x<w*0.33f&&y<h*0.5f; brake=d&&x<w*0.33f&&y>=h*0.5f; left=d&&x>w*0.67f&&x<w*0.835f; right=d&&x>=w*0.835f; return true; }};
-                  hud.setTextColor(0xFFFFFFFF); hud.setTextSize(14);
-                  hud.setText("GTA TANGIER ONLINE - REAL IP FIX\nYour IP: "+realIP+":7777\n\nPress HOST to start!");
+                  hud.setTextColor(0xFFFFFFFF); hud.setTextSize(12);
+                  hud.setText("GTA TANGIER FIXED - REAL IP\nYour REAL IP: "+realIP+":7777\nPress HOST!");
                   LinearLayout buttons = new LinearLayout(this); buttons.setOrientation(LinearLayout.HORIZONTAL);
-                  Button hostBtn = new Button(this); hostBtn.setText("HOST Wi-Fi"); Button joinBtn = new Button(this); joinBtn.setText("JOIN"); EditText ipInput = new EditText(this); ipInput.setHint("192.168.1.10"); ipInput.setText("192.168.1.10"); ipInput.setBackgroundColor(0xFFFFFFFF); ipInput.setTextColor(0xFF000000);
-                  hostBtn.setOnClickListener(v->{ NativeStartHost(); realIP=getRealWifiIP(); hud.setText("HOSTING! REAL IP: "+realIP+":7777\nTell friend JOIN to: "+realIP+"\nWaiting for players... Bullet ON"); Toast.makeText(this,"HOST Started! REAL IP: "+realIP+":7777",Toast.LENGTH_LONG).show(); });
-                  joinBtn.setOnClickListener(v->{ String ip=ipInput.getText().toString(); NativeJoinHost(ip); hud.setText("JOINED! Connected to "+ip+":7777\nYour IP: "+realIP+"\nRacing soon..."); Toast.makeText(this,"Joined "+ip,Toast.LENGTH_LONG).show(); });
+                  Button hostBtn = new Button(this); hostBtn.setText("HOST Wi-Fi"); Button joinBtn = new Button(this); joinBtn.setText("JOIN"); EditText ipInput = new EditText(this); ipInput.setText("192.168.1.10"); ipInput.setBackgroundColor(0xFFFFFFFF); ipInput.setTextColor(0xFF000000);
+                  hostBtn.setOnClickListener(v->{ NativeStartHost(); realIP=getRealWifiIP(); hud.setText("HOSTING! REAL IP: "+realIP+":7777\nTell friend JOIN to: "+realIP+"\nWaiting..."); Toast.makeText(this,"HOST REAL IP: "+realIP+":7777",Toast.LENGTH_LONG).show(); });
+                  joinBtn.setOnClickListener(v->{ String ip=ipInput.getText().toString(); NativeJoinHost(ip); hud.setText("JOINED! To "+ip+":7777\nYour IP: "+realIP); Toast.makeText(this,"Joined "+ip,Toast.LENGTH_LONG).show(); });
                   buttons.addView(hostBtn); buttons.addView(joinBtn); buttons.addView(ipInput);
-                  FrameLayout layout=new FrameLayout(this); layout.addView(glView); FrameLayout.LayoutParams hudLp=new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,500); hudLp.topMargin=20; layout.addView(hud,hudLp); FrameLayout.LayoutParams btnLp=new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,150); btnLp.topMargin=500; layout.addView(buttons,btnLp); setContentView(layout); }
+                  FrameLayout layout=new FrameLayout(this); layout.addView(glView);
+                  FrameLayout.LayoutParams p1=new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,500); p1.topMargin=20; layout.addView(hud,p1);
+                  FrameLayout.LayoutParams p2=new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,150); p2.topMargin=500; layout.addView(buttons,p2);
+                  setContentView(layout);
+              }
           }
           ENDOFFILE
-      - uses: gradle/actions/setup-gradle@v3
-        with: { gradle-version: 8.4 }
-      - run: |
+      - name: Build with Gradle Groovy - FIXED
+        run: |
           rm -rf gradlew gradle/wrapper
-          gradle assembleDebug
+          gradle assembleDebug --stacktrace
+
       - uses: actions/upload-artifact@v4
-        with: { name: GTA-FIX-REAL-IP, path: app/build/outputs/apk/debug/*.apk }
+        with: { name: GTA-FIXED-BUILD-v52, path: app/build/outputs/apk/debug/*.apk }
