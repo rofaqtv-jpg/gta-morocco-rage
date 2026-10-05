@@ -13,6 +13,11 @@ jobs:
       - name: Create Project
         run: |
           mkdir -p app/src/main/cpp/rage app/src/main/cpp/physics app/src/main/cpp/scripting app/src/main/java/com/turrinistudio/gtav
+          cat > gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          org.gradle.jvmargs=-Xmx4g
+          EOF
           cat > settings.gradle.kts << 'EOF'
           pluginManagement {
               repositories {
@@ -54,19 +59,27 @@ jobs:
                   externalNativeBuild {
                       cmake {
                           cppFlags += "-std=c++17"
-                          arguments += listOf("-DANDROID_STL=c++_shared")
                       }
                   }
               }
               externalNativeBuild {
                   cmake {
                       path = file("src/main/cpp/CMakeLists.txt")
+                      version = "3.22.1"
                   }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
               }
           }
           dependencies {
               implementation("androidx.core:core-ktx:1.12.0")
               implementation("androidx.appcompat:appcompat:1.6.1")
+              implementation("com.google.android.material:material:1.11.0")
           }
           EOF
           cat > app/src/main/cpp/CMakeLists.txt << 'EOF'
@@ -104,6 +117,6 @@ jobs:
         with: { gradle-version: 8.4 }
       - run: |
           rm -rf gradlew gradle/wrapper
-          gradle assembleDebug
+          gradle assembleDebug --info
       - uses: actions/upload-artifact@v4
         with: { name: GTA-APK, path: '**/*.apk' }
