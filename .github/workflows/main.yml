@@ -1,4 +1,4 @@
-name: Build GTA RAGE
+name: Build GTA RAGE v1.0
 on: [push]
 jobs:
   build:
@@ -8,7 +8,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { java-version: '17', distribution: 'temurin' }
       - uses: android-actions/setup-android@v4
-      - name: Create GTA v0.9 Collision
+      - name: Create GTA v1.0 ALL IN
         run: |
           mkdir -p app/src/main/java/com/turrinistudio/gtav
           cat > settings.gradle.kts << 'EOF'
@@ -29,15 +29,15 @@ jobs:
                   applicationId = "com.turrinistudio.gtav"
                   minSdk = 21
                   targetSdk = 33
-                  versionCode = 9
-                  versionName = "0.9-Collision"
+                  versionCode = 10
+                  versionName = "1.0-ALL-IN"
               }
           }
           EOF
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="GTA Morocco" android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+              <application android:label="GTA Tangier" android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
                   <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape">
                       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
                   </activity>
@@ -59,29 +59,37 @@ jobs:
           import java.nio.FloatBuffer;
           import java.util.ArrayList;
           import java.util.List;
+          import java.util.Random;
 
           public class MainActivity extends Activity {
-              float carX=0, carZ=0, carRot=0, speed=0;
+              float carX=0, carZ=0, carRot=0, speed=0, drift=0;
               boolean gas=false, brake=false, left=false, right=false;
               List<float[]> buildings = new ArrayList<>();
+              List<float[]> traffic = new ArrayList<>();
+              Random rnd = new Random();
 
               @Override
               protected void onCreate(Bundle b) {
                   super.onCreate(b);
-                  // Generate buildings list for collision
                   buildings.clear();
-                  for(int i=-5;i<=5;i++){
-                      for(int j=-5;j<=5;j++){
+                  traffic.clear();
+                  // Corniche buildings only on one side
+                  for(int i=-20;i<=20;i++){
+                      for(int j=0;j<8;j++){
                           if(i==0 && j==0) continue;
-                          buildings.add(new float[]{i*8, j*8, 2.5f});
+                          if(j<2) buildings.add(new float[]{i*8, j*8+10, 3f, 2+rnd.nextInt(4)}); // buildings north
                       }
+                  }
+                  // Traffic cars on road
+                  for(int i=0;i<12;i++){
+                      traffic.add(new float[]{ (rnd.nextFloat()-0.5f)*100, rnd.nextFloat()*80, rnd.nextFloat()*0.3f+0.1f, rnd.nextInt(3) });
                   }
 
                   GLSurfaceView glView = new GLSurfaceView(this);
                   glView.setRenderer(new GLSurfaceView.Renderer() {
                       FloatBuffer buf;
                       public void onSurfaceCreated(GL10 gl, EGLConfig c) {
-                          gl.glClearColor(0.33f, 0.71f, 0.98f, 1f); // Tangier sky
+                          gl.glClearColor(0.3f, 0.7f, 0.99f, 1f);
                           gl.glEnable(GL10.GL_DEPTH_TEST);
                           float[] v = {
                               -0.5f,-0.5f,0.5f, 0.5f,-0.5f,0.5f, -0.5f,0.5f,0.5f, 0.5f,0.5f,0.5f,
@@ -99,64 +107,96 @@ jobs:
                           gl.glViewport(0,0,w,h);
                           gl.glMatrixMode(GL10.GL_PROJECTION);
                           gl.glLoadIdentity();
-                          gl.glFrustumf(-(float)w/h, (float)w/h, -1, 1, 1.5f, 100);
+                          gl.glFrustumf(-(float)w/h, (float)w/h, -1, 1, 1.5f, 200);
                       }
                       public void onDrawFrame(GL10 gl) {
-                          float nextSpeed = speed;
-                          if(gas) nextSpeed+=0.015f;
-                          if(brake) nextSpeed-=0.025f;
-                          if(left) carRot+=2.8f;
-                          if(right) carRot-=2.8f;
-                          if(nextSpeed>0.45f) nextSpeed=0.45f;
-                          if(nextSpeed<-0.25f) nextSpeed=-0.25f;
-                          nextSpeed*=0.988f;
+                          // Physics with drift
+                          float accel = 0;
+                          if(gas) accel+=0.022f;
+                          if(brake) accel-=0.03f;
+                          speed += accel;
+                          speed*=0.992f;
+                          if(speed>0.6f) speed=0.6f;
+                          if(speed<-0.3f) speed=-0.3f;
 
-                          float nextX = carX + (float)Math.sin(Math.toRadians(carRot))*nextSpeed;
-                          float nextZ = carZ + (float)Math.cos(Math.toRadians(carRot))*nextSpeed;
+                          float turnSpeed = Math.abs(speed)*4f;
+                          if(left) { carRot+=turnSpeed; drift+=0.1f; }
+                          if(right) { carRot-=turnSpeed; drift-=0.1f; }
+                          drift*=0.92f;
 
-                          boolean collide = false;
-                          for(float[] bld : buildings){
-                              float dx = nextX - bld[0];
-                              float dz = nextZ - bld[1];
-                              if(Math.abs(dx) < (bld[2]/2+1.2f) && Math.abs(dz) < (bld[2]/2+1.2f)){
-                                  collide = true; break;
-                              }
+                          float nextX = carX + (float)Math.sin(Math.toRadians(carRot+drift*10))*speed;
+                          float nextZ = carZ + (float)Math.cos(Math.toRadians(carRot+drift*10))*speed;
+
+                          boolean collide=false;
+                          for(float[] bl: buildings){
+                              if(Math.abs(nextX-bl[0])<bl[2]/2+1.3f && Math.abs(nextZ-bl[1])<bl[2]/2+1.3f){ collide=true; break; }
                           }
-                          if(!collide){ carX=nextX; carZ=nextZ; speed=nextSpeed; }
-                          else { speed *= -0.3f; }
+                          if(!collide){ carX=nextX; carZ=nextZ; } else { speed*=-0.4f; drift*= -0.5f; }
+
+                          // Update traffic
+                          for(float[] t: traffic){
+                              t[0] += (float)Math.sin(Math.toRadians(t[3]*90))*t[2];
+                              t[1] += (float)Math.cos(Math.toRadians(t[3]*90))*t[2];
+                              if(t[0]>60) t[0]=-60; if(t[0]<-60) t[0]=60;
+                              if(t[1]>90) t[1]=-20; if(t[1]<-20) t[1]=90;
+                          }
 
                           gl.glClear(GL10.GL_COLOR_BUFFER_BIT|GL10.GL_DEPTH_BUFFER_BIT);
                           gl.glMatrixMode(GL10.GL_MODELVIEW);
                           gl.glLoadIdentity();
-                          gl.glTranslatef(0, -2.5f, -14);
-                          gl.glRotatef(28,1,0,0);
+                          gl.glTranslatef(0, -3f, -16);
+                          gl.glRotatef(30,1,0,0);
                           gl.glRotatef(-carRot,0,1,0);
                           gl.glTranslatef(-carX, 0, -carZ);
 
+                          // Sea - south side
+                          gl.glPushMatrix(); gl.glTranslatef(0,-0.6f,-50);
+                          drawCube(gl, 300,0.1f,100, 0.05f,0.35f,0.85f); gl.glPopMatrix();
+                          // Corniche road
                           gl.glPushMatrix(); gl.glTranslatef(0,-0.5f,0);
-                          drawCube(gl, 120,0.3f,120, 0.22f,0.22f,0.22f); gl.glPopMatrix();
+                          drawCube(gl, 200,0.3f,20, 0.18f,0.18f,0.18f); gl.glPopMatrix();
                           gl.glPushMatrix(); gl.glTranslatef(0,-0.34f,0);
-                          drawCube(gl, 0.6f,0.02f,120, 1f,0.9f,0.1f); gl.glPopMatrix();
+                          drawCube(gl, 0.5f,0.02f,200, 1f,0.9f,0.1f); gl.glPopMatrix();
+                          // Beach sand
+                          gl.glPushMatrix(); gl.glTranslatef(0,-0.55f,-15);
+                          drawCube(gl, 200,0.2f,10, 0.9f,0.8f,0.5f); gl.glPopMatrix();
 
-                          for(float[] bld : buildings){
-                              float h = 3 + (Math.abs(bld[0]+bld[1])%4);
+                          // Buildings
+                          for(float[] bl: buildings){
                               gl.glPushMatrix();
-                              gl.glTranslatef(bld[0], h/2-0.5f, bld[1]);
-                              // Tangier white-blue buildings
-                              float shade = 0.9f + (bld[0]%2)*0.05f;
-                              drawCube(gl, bld[2], h, bld[2], shade, shade, 0.92f);
+                              gl.glTranslatef(bl[0], bl[3]/2-0.5f, bl[1]);
+                              drawCube(gl, bl[2], bl[3], bl[2], 0.95f,0.95f,0.88f);
+                              // windows
+                              gl.glPushMatrix(); gl.glTranslatef(0,0.2f,bl[2]/2+0.01f);
+                              drawCube(gl, bl[2]*0.6f, bl[3]*0.5f, 0.01f, 0.2f,0.5f,0.9f); gl.glPopMatrix();
                               gl.glPopMatrix();
                           }
 
+                          // Traffic cars
+                          for(float[] t: traffic){
+                              gl.glPushMatrix();
+                              gl.glTranslatef(t[0],0.1f,t[1]);
+                              float r=0.2f,g=0.2f,b=0.8f;
+                              if(t[3]==1){ r=1f; g=1f; b=0.2f; } else if(t[3]==2){ r=0.2f; g=0.8f; b=0.2f; }
+                              drawCube(gl, 1.2f,0.5f,2f, r,g,b);
+                              gl.glPopMatrix();
+                          }
+
+                          // Player car with NEON
                           gl.glPushMatrix();
-                          gl.glTranslatef(carX, 0.25f, carZ);
+                          gl.glTranslatef(carX, 0.3f, carZ);
                           gl.glRotatef(carRot,0,1,0);
-                          drawCube(gl, 1.3f,0.55f,2.4f, 0.95f,0.08f,0.08f);
-                          gl.glPushMatrix(); gl.glTranslatef(0,0.5f,-0.15f); drawCube(gl, 1.1f,0.45f,1.1f, 0.15f,0.15f,0.25f); gl.glPopMatrix();
-                          gl.glPushMatrix(); gl.glTranslatef(-0.7f,-0.35f,0.8f); drawCube(gl,0.25f,0.35f,0.5f,0.05f,0.05f,0.05f); gl.glPopMatrix();
-                          gl.glPushMatrix(); gl.glTranslatef(0.7f,-0.35f,0.8f); drawCube(gl,0.25f,0.35f,0.5f,0.05f,0.05f,0.05f); gl.glPopMatrix();
-                          gl.glPushMatrix(); gl.glTranslatef(-0.7f,-0.35f,-0.8f); drawCube(gl,0.25f,0.35f,0.5f,0.05f,0.05f,0.05f); gl.glPopMatrix();
-                          gl.glPushMatrix(); gl.glTranslatef(0.7f,-0.35f,-0.8f); drawCube(gl,0.25f,0.35f,0.5f,0.05f,0.05f,0.05f); gl.glPopMatrix();
+                          // Neon glow under car
+                          gl.glPushMatrix(); gl.glTranslatef(0,-0.35f,0);
+                          float neonR = Math.abs(drift)>0.5f? 1f:0.1f;
+                          drawCube(gl, 1.8f,0.05f,2.8f, neonR,0.1f,1f); gl.glPopMatrix();
+                          // Car body
+                          drawCube(gl, 1.4f,0.6f,2.6f, 1f,0.05f,0.1f);
+                          gl.glPushMatrix(); gl.glTranslatef(0,0.55f,-0.2f); drawCube(gl, 1.2f,0.5f,1.2f, 0.1f,0.1f,0.2f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(-0.7f,-0.3f,0.9f); drawCube(gl,0.25f,0.35f,0.5f,0.05f,0.05f,0.05f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(0.7f,-0.3f,0.9f); drawCube(gl,0.25f,0.35f,0.5f,0.05f,0.05f,0.05f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(-0.7f,-0.3f,-0.9f); drawCube(gl,0.25f,0.35f,0.5f,0.05f,0.05f,0.05f); gl.glPopMatrix();
+                          gl.glPushMatrix(); gl.glTranslatef(0.7f,-0.3f,-0.9f); drawCube(gl,0.25f,0.35f,0.5f,0.05f,0.05f,0.05f); gl.glPopMatrix();
                           gl.glPopMatrix();
                       }
                       void drawCube(GL10 gl, float sx, float sy, float sz, float r, float g, float b){
@@ -174,17 +214,17 @@ jobs:
                       public boolean onTouchEvent(MotionEvent e){
                           float x=e.getX(), y=e.getY(), w=getWidth(), h=getHeight();
                           boolean down=e.getAction()!=MotionEvent.ACTION_UP;
-                          gas = down && x < w*0.3f && y < h*0.6f;
-                          brake = down && x < w*0.3f && y >= h*0.6f;
-                          left = down && x > w*0.7f && x < w*0.85f;
-                          right = down && x >= w*0.85f;
+                          gas = down && x < w*0.32f && y < h*0.55f;
+                          brake = down && x < w*0.32f && y >= h*0.55f;
+                          left = down && x > w*0.68f && x < w*0.84f;
+                          right = down && x >= w*0.84f;
                           return true;
                       }
                   };
-                  hud.setText("GTA MOROCCO v0.9\nCOLLISION ON - Tangier\n[GAS] top-left [BRAKE] bottom-left\nTurn -> right side");
+                  hud.setText("GTA TANGIER v1.0 ALL IN\nCORNICHE | TRAFFIC | DRIFT+NEON\n[GAS] top-left [BRAKE] bottom-left\n[◀ ▶] right - Drift when turning fast!");
                   hud.setTextColor(0xFFFFFFFF);
-                  hud.setTextSize(11);
-                  hud.setPadding(20,20,20,20);
+                  hud.setTextSize(10);
+                  hud.setPadding(15,15,15,15);
 
                   FrameLayout layout=new FrameLayout(this);
                   layout.addView(glView); layout.addView(hud);
@@ -198,4 +238,4 @@ jobs:
           rm -rf gradlew gradle/wrapper
           gradle assembleDebug
       - uses: actions/upload-artifact@v4
-        with: { name: GTA-0.9-Collision, path: app/build/outputs/apk/debug/*.apk }
+        with: { name: GTA-v1.0-ALL-IN, path: app/build/outputs/apk/debug/*.apk }
