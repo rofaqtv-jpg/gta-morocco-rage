@@ -1,4 +1,4 @@
-name: Build GTA CONTROLS FIXED v53
+name: Build GTA v54 FINAL FIXED
 on: [push]
 jobs:
   build:
@@ -12,39 +12,69 @@ jobs:
         with: { ndk-version: r25b }
       - name: Clone Bullet
         run: git clone https://github.com/bulletphysics/bullet3.git --depth 1
-      - name: Build CONTROLS FIXED
+      - name: Create v54 FIXED
         run: |
           mkdir -p app/src/main/cpp app/src/main/java/com/turrinistudio/gtav
           cat > settings.gradle << 'EOF'
           include ':app'
           EOF
           cat > build.gradle << 'EOF'
-          buildscript { repositories { google(); mavenCentral() } dependencies { classpath 'com.android.tools.build:gradle:8.2.2' } }
-          allprojects { repositories { google(); mavenCentral() } }
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.2.2'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          task clean(type: Delete) {
+              delete rootProject.buildDir
+          }
           EOF
           cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
           android {
-              namespace 'com.turrinistudio.gtav'
               compileSdkVersion 33
               defaultConfig {
                   applicationId "com.turrinistudio.gtav"
                   minSdkVersion 21
                   targetSdkVersion 33
-                  versionCode 53
-                  versionName "5.3-CONTROLS-FIXED"
-                  externalNativeBuild { cmake { cppFlags "-std=c++17 -frtti -fexceptions"; arguments "-DANDROID_STL=c++_shared" } }
-                  ndk { abiFilters "arm64-v8a" }
+                  versionCode 54
+                  versionName "5.4-CONTROLS"
+                  externalNativeBuild {
+                      cmake {
+                          cppFlags "-std=c++17 -frtti -fexceptions"
+                          arguments "-DANDROID_STL=c++_shared"
+                      }
+                  }
+                  ndk {
+                      abiFilters "arm64-v8a"
+                  }
               }
-              externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt" } }
+              externalNativeBuild {
+                  cmake {
+                      path "src/main/cpp/CMakeLists.txt"
+                  }
+              }
+              namespace 'com.turrinistudio.gtav'
           }
           EOF
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-              <application android:label="GTA Tangier CONTROLS" android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:extractNativeLibs="true">
-                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+              <application android:label="GTA CONTROLS" android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:extractNativeLibs="true">
+                  <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape">
+                      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+                  </activity>
               </application>
           </manifest>
           EOF
@@ -53,8 +83,8 @@ jobs:
           project(gta)
           set(BULLET_ROOT ${CMAKE_SOURCE_DIR}/../../../../bullet3)
           include_directories(${BULLET_ROOT}/src)
-          file(GLOB BULLET ${BULLET_ROOT}/src/BulletCollision/CollisionShapes/*.cpp ${BULLET_ROOT}/src/BulletCollision/CollisionDispatch/*.cpp ${BULLET_ROOT}/src/BulletCollision/BroadphaseCollision/*.cpp ${BULLET_ROOT}/src/BulletDynamics/Dynamics/*.cpp ${BULLET_ROOT}/src/BulletDynamics/ConstraintSolver/*.cpp ${BULLET_ROOT}/src/BulletDynamics/Vehicle/*.cpp ${BULLET_ROOT}/src/LinearMath/*.cpp)
-          add_library(bullet STATIC ${BULLET})
+          file(GLOB BULLET_SRC ${BULLET_ROOT}/src/BulletCollision/CollisionShapes/*.cpp ${BULLET_ROOT}/src/BulletCollision/CollisionDispatch/*.cpp ${BULLET_ROOT}/src/BulletCollision/BroadphaseCollision/*.cpp ${BULLET_ROOT}/src/BulletDynamics/Dynamics/*.cpp ${BULLET_ROOT}/src/BulletDynamics/ConstraintSolver/*.cpp ${BULLET_ROOT}/src/BulletDynamics/Vehicle/*.cpp ${BULLET_ROOT}/src/LinearMath/*.cpp)
+          add_library(bullet STATIC ${BULLET_SRC})
           target_include_directories(bullet PUBLIC ${BULLET_ROOT}/src)
           add_library(rage SHARED main.cpp)
           find_library(log-lib log)
@@ -66,7 +96,6 @@ jobs:
           #include <android/log.h>
           #include <btBulletDynamicsCommon.h>
           #include <cmath>
-          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,"RAGE-CTRL",__VA_ARGS__)
           struct Engine {
               btDiscreteDynamicsWorld* world; btRigidBody* car; btRaycastVehicle* veh;
               float x=0,z=0,rot=0,sp=0; bool init=false;
@@ -84,10 +113,9 @@ jobs:
                   for(int i=0;i<4;i++){
                       btVector3 conn(i<2?0.9f:-0.9f,-0.3f,i%2==0?1.2f:-1.2f);
                       auto& w=veh->addWheel(conn,btVector3(0,-1,0),btVector3(-1,0,0),0.4f,0.6f,tun,i<2);
-                      w.m_suspensionStiffness=30; w.m_wheelsDampingRelaxation=2.3f; w.m_wheelsDampingCompression=4.4f;
-                      w.m_frictionSlip=1.5f; w.m_rollInfluence=0.1f;
+                      w.m_suspensionStiffness=30; w.m_frictionSlip=1.5f;
                   }
-                  init=true; LOGI("CONTROLS FIXED READY");
+                  init=true;
               }
               void Update(float dt,bool gas,bool brake,bool left,bool right){
                   if(!init) Init();
@@ -124,7 +152,6 @@ jobs:
               public native void NativeInit(); public native void NativeUpdate(float dt, boolean gas, boolean brake, boolean left, boolean right);
               public native float NativeGetX(); public native float NativeGetZ(); public native float NativeGetRot(); public native float NativeGetSpeed();
               public native boolean NativeStartHost(); public native boolean NativeJoinHost(String ip);
-              // CONTROLS - FIXED!
               boolean gas=false, brake=false, left=false, right=false;
               TextView hud, speedText; String realIP="192.168.1.10";
               String getRealWifiIP(){ try{ WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE); int ip=wm.getConnectionInfo().getIpAddress(); String s=Formatter.formatIpAddress(ip); if(s!=null &&!s.equals("0.0.0.0")) return s; }catch(Exception e){} return "192.168.1.10"; }
@@ -133,62 +160,30 @@ jobs:
                   GLSurfaceView glView = new GLSurfaceView(this);
                   glView.setRenderer(new GLSurfaceView.Renderer(){
                       FloatBuffer cube;
-                      public void onSurfaceCreated(GL10 gl, EGLConfig c){
-                          gl.glClearColor(0.04f,0.08f,0.25f,1f); gl.glEnable(GL10.GL_DEPTH_TEST);
-                          float[] v={-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f};
-                          ByteBuffer bb=ByteBuffer.allocateDirect(v.length*4); bb.order(ByteOrder.nativeOrder()); cube=bb.asFloatBuffer(); cube.put(v); cube.position(0);
-                      }
+                      public void onSurfaceCreated(GL10 gl, EGLConfig c){ gl.glClearColor(0.04f,0.08f,0.25f,1f); gl.glEnable(GL10.GL_DEPTH_TEST); float[] v={-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f}; ByteBuffer bb=ByteBuffer.allocateDirect(v.length*4); bb.order(ByteOrder.nativeOrder()); cube=bb.asFloatBuffer(); cube.put(v); cube.position(0); }
                       public void onSurfaceChanged(GL10 gl,int w,int h){ gl.glViewport(0,0,w,h); gl.glMatrixMode(GL10.GL_PROJECTION); gl.glLoadIdentity(); gl.glFrustumf(-(float)w/h*0.7f,(float)w/h*0.7f,-0.7f,0.7f,1.5f,500); }
-                      public void onDrawFrame(GL10 gl){
-                          NativeUpdate(0.016f,gas,brake,left,right);
-                          float carX=NativeGetX(); float carZ=NativeGetZ(); float carRot=NativeGetRot(); float speed=NativeGetSpeed();
-                          runOnUiThread(()->{ speedText.setText(String.format("%.0f KM/H",speed)); });
-                          gl.glClear(GL10.GL_COLOR_BUFFER_BIT|GL10.GL_DEPTH_BUFFER_BIT);
-                          gl.glMatrixMode(GL10.GL_MODELVIEW); gl.glLoadIdentity();
-                          gl.glTranslatef(0,-4f,-15); gl.glRotatef(22,1,0,0); gl.glRotatef(-carRot,0,1,0); gl.glTranslatef(-carX,0,-carZ);
-                          // Ground - Corniche Tangier - light gray road
-                          gl.glPushMatrix(); gl.glTranslatef(0,-0.5f,0); drawCube(gl,300,0.5f,300,0.22f,0.22f,0.24f); gl.glPopMatrix();
-                          // Road markings
-                          for(int i=-20;i<20;i++){ gl.glPushMatrix(); gl.glTranslatef(0,0.01f,i*8); drawCube(gl,0.3f,0.02f,3f,1f,1f,1f); gl.glPopMatrix(); }
-                          // Buildings - Tangier style
-                          for(int i=-5;i<5;i++){ for(int j=-5;j<5;j++){ if(Math.abs(i)<2 && Math.abs(j)<2) continue; gl.glPushMatrix(); gl.glTranslatef(i*30,2.5f,j*30); float h=3+ (float)Math.random()*8; drawCube(gl,4,h,4,0.6f,0.7f,0.85f); gl.glPopMatrix(); } }
-                          // Player Car - RED with details
-                          gl.glPushMatrix(); gl.glTranslatef(carX,0.6f,carZ); gl.glRotatef(carRot,0,1,0);
-                          drawCube(gl,1.8f,0.7f,3.4f,0.9f,0.05f,0.05f); // body red
-                          gl.glTranslatef(0,0.5f,0.2f); drawCube(gl,1.6f,0.5f,1.8f,0.15f,0.15f,0.9f); // cabin blue glass
-                          gl.glPopMatrix();
-                      }
-                      void drawCube(GL10 gl,float sx,float sy,float sz,float r,float g,float b){ gl.glColor4f(r,g,b,1); gl.glPushMatrix(); gl.glScalef(sx,sy,sz); gl.glEnableClientState(GL10.GL_VERTEX_ARRAY); gl.glVertexPointer(3,GL10.GL_FLOAT,0,cube); for(int i=0;i<6;i++) gl.glDrawArrays(GL10.GL_TRIANGLE_STRIP,i*4,4); gl.glDisableClientState(GL10.GL_VERTEX_ARRAY); gl.glPopMatrix(); }
+                      public void onDrawFrame(GL10 gl){ NativeUpdate(0.016f,gas,brake,left,right); float carX=NativeGetX(); float carZ=NativeGetZ(); float carRot=NativeGetRot(); float speed=NativeGetSpeed(); runOnUiThread(()->{ speedText.setText(String.format("%.0f KM/H",speed)); }); gl.glClear(GL10.GL_COLOR_BUFFER_BIT|GL10.GL_DEPTH_BUFFER_BIT); gl.glMatrixMode(GL10.GL_MODELVIEW); gl.glLoadIdentity(); gl.glTranslatef(0,-4f,-15); gl.glRotatef(22,1,0,0); gl.glRotatef(-carRot,0,1,0); gl.glTranslatef(-carX,0,-carZ); gl.glPushMatrix(); gl.glTranslatef(0,-0.5f,0); drawCube(gl,300,0.5f,300,0.22f,0.22f,0.24f); gl.glPopMatrix(); for(int i=-20;i<20;i++){ gl.glPushMatrix(); gl.glTranslatef(0,0.01f,i*8); drawCube(gl,0.3f,0.02f,3f,1f,1f,1f); gl.glPopMatrix(); } for(int i=-5;i<5;i++){ for(int j=-5;j<5;j++){ if(Math.abs(i)<2 && Math.abs(j)<2) continue; gl.glPushMatrix(); gl.glTranslatef(i*30,2.5f,j*30); float h=3+ (float)Math.random()*8; drawCube(gl,4,h,4,0.6f,0.7f,0.85f); gl.glPopMatrix(); } } gl.glPushMatrix(); gl.glTranslatef(carX,0.6f,carZ); gl.glRotatef(carRot,0,1,0); drawCube(gl,1.8f,0.7f,3.4f,0.9f,0.05f,0.05f); gl.glTranslatef(0,0.5f,0.2f); drawCube(gl,1.6f,0.5f,1.8f,0.15f,0.15f,0.9f); gl.glPopMatrix(); } void drawCube(GL10 gl,float sx,float sy,float sz,float r,float g,float b){ gl.glColor4f(r,g,b,1); gl.glPushMatrix(); gl.glScalef(sx,sy,sz); gl.glEnableClientState(GL10.GL_VERTEX_ARRAY); gl.glVertexPointer(3,GL10.GL_FLOAT,0,cube); for(int i=0;i<6;i++) gl.glDrawArrays(GL10.GL_TRIANGLE_STRIP,i*4,4); gl.glDisableClientState(GL10.GL_VERTEX_ARRAY); gl.glPopMatrix(); }
                   });
-                  // HUD
-                  hud = new TextView(this); hud.setTextColor(Color.WHITE); hud.setTextSize(11);
-                  hud.setText("GTA TANGIER v5.3\nIP: "+realIP+":7777\nCONTROLS FIXED!");
-                  speedText = new TextView(this); speedText.setTextColor(Color.YELLOW); speedText.setTextSize(20); speedText.setText("0 KM/H");
-                  // NEW CONTROLS - 4 BIG BUTTONS - FIXED!
-                  Button btnGas = new Button(this); btnGas.setText("▲ GAS"); btnGas.setBackgroundColor(Color.argb(150,0,200,0));
-                  Button btnBrake = new Button(this); btnBrake.setText("▼ BRAKE"); btnBrake.setBackgroundColor(Color.argb(150,200,0,0));
-                  Button btnLeft = new Button(this); btnLeft.setText("◀ LEFT"); btnLeft.setBackgroundColor(Color.argb(150,200,200,0));
-                  Button btnRight = new Button(this); btnRight.setText("RIGHT ▶"); btnRight.setBackgroundColor(Color.argb(150,200,200,0));
-                  // Touch listeners - REAL CONTROLS!
-                  View.OnTouchListener gasTouch = (v,e)->{ gas = e.getAction()!=MotionEvent.ACTION_UP; return false; };
-                  View.OnTouchListener brakeTouch = (v,e)->{ brake = e.getAction()!=MotionEvent.ACTION_UP; return false; };
-                  View.OnTouchListener leftTouch = (v,e)->{ left = e.getAction()!=MotionEvent.ACTION_UP; return false; };
-                  View.OnTouchListener rightTouch = (v,e)->{ right = e.getAction()!=MotionEvent.ACTION_UP; return false; };
-                  btnGas.setOnTouchListener(gasTouch); btnBrake.setOnTouchListener(brakeTouch); btnLeft.setOnTouchListener(leftTouch); btnRight.setOnTouchListener(rightTouch);
-                  // Multiplayer buttons
+                  hud = new TextView(this); hud.setTextColor(Color.WHITE); hud.setTextSize(11); hud.setText("GTA TANGIER v5.4\nIP: "+realIP+":7777\nCONTROLS FIXED!");
+                  speedText = new TextView(this); speedText.setTextColor(Color.YELLOW); speedText.setTextSize(22); speedText.setText("0 KM/H");
+                  Button btnGas = new Button(this); btnGas.setText("▲ GAS"); btnGas.setBackgroundColor(Color.argb(180,0,200,0));
+                  Button btnBrake = new Button(this); btnBrake.setText("▼ BRAKE"); btnBrake.setBackgroundColor(Color.argb(180,200,0,0));
+                  Button btnLeft = new Button(this); btnLeft.setText("◀ LEFT"); btnLeft.setBackgroundColor(Color.argb(180,200,200,0));
+                  Button btnRight = new Button(this); btnRight.setText("RIGHT ▶"); btnRight.setBackgroundColor(Color.argb(180,200,200,0));
+                  btnGas.setOnTouchListener((v,e)->{ gas = e.getAction()!=MotionEvent.ACTION_UP; return false; });
+                  btnBrake.setOnTouchListener((v,e)->{ brake = e.getAction()!=MotionEvent.ACTION_UP; return false; });
+                  btnLeft.setOnTouchListener((v,e)->{ left = e.getAction()!=MotionEvent.ACTION_UP; return false; });
+                  btnRight.setOnTouchListener((v,e)->{ right = e.getAction()!=MotionEvent.ACTION_UP; return false; });
                   LinearLayout mpRow = new LinearLayout(this); mpRow.setOrientation(LinearLayout.HORIZONTAL);
                   Button hostBtn = new Button(this); hostBtn.setText("HOST"); Button joinBtn = new Button(this); joinBtn.setText("JOIN");
                   EditText ipInput = new EditText(this); ipInput.setText("192.168.1.10"); ipInput.setBackgroundColor(Color.WHITE); ipInput.setTextColor(Color.BLACK); ipInput.setWidth(300);
-                  hostBtn.setOnClickListener(v->{ NativeStartHost(); realIP=getRealWifiIP(); hud.setText("HOSTING!\nREAL IP: "+realIP+":7777\nTell friend JOIN: "+realIP); Toast.makeText(this,"HOST: "+realIP,Toast.LENGTH_LONG).show(); });
-                  joinBtn.setOnClickListener(v->{ String ip=ipInput.getText().toString(); NativeJoinHost(ip); hud.setText("JOINED: "+ip); Toast.makeText(this,"Joined "+ip,Toast.LENGTH_SHORT).show(); });
+                  hostBtn.setOnClickListener(v->{ NativeStartHost(); realIP=getRealWifiIP(); hud.setText("HOSTING!\nREAL IP: "+realIP+":7777\nTell friend: "+realIP); Toast.makeText(this,"HOST: "+realIP,Toast.LENGTH_LONG).show(); });
+                  joinBtn.setOnClickListener(v->{ String ip=ipInput.getText().toString(); NativeJoinHost(ip); hud.setText("JOINED: "+ip); });
                   mpRow.addView(hostBtn); mpRow.addView(joinBtn); mpRow.addView(ipInput);
-                  // Layout - CONTROLS AT BOTTOM!
-                  FrameLayout root = new FrameLayout(this);
-                  root.addView(glView);
+                  FrameLayout root = new FrameLayout(this); root.addView(glView);
                   FrameLayout.LayoutParams lpHud = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT); lpHud.leftMargin=10; lpHud.topMargin=10; root.addView(hud,lpHud);
                   FrameLayout.LayoutParams lpSpeed = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT); lpSpeed.leftMargin=10; lpSpeed.topMargin=120; root.addView(speedText,lpSpeed);
                   FrameLayout.LayoutParams lpMp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 120); lpMp.topMargin=200; root.addView(mpRow,lpMp);
-                  // Bottom controls - GAS/BRAKE left, LEFT/RIGHT right
                   LinearLayout bottomControls = new LinearLayout(this); bottomControls.setOrientation(LinearLayout.HORIZONTAL);
                   LinearLayout leftCol = new LinearLayout(this); leftCol.setOrientation(LinearLayout.VERTICAL); leftCol.addView(btnGas); leftCol.addView(btnBrake);
                   LinearLayout rightCol = new LinearLayout(this); rightCol.setOrientation(LinearLayout.HORIZONTAL); rightCol.addView(btnLeft); rightCol.addView(btnRight);
@@ -203,4 +198,4 @@ jobs:
           rm -rf gradlew gradle/wrapper
           gradle assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
-        with: { name: GTA-CONTROLS-FIXED-v53, path: app/build/outputs/apk/debug/*.apk }
+        with: { name: GTA-v54-CONTROLS-FIXED, path: app/build/outputs/apk/debug/*.apk }
